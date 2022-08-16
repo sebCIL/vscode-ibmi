@@ -12,6 +12,7 @@
    - [Tricks](pages/tips/tricks.md)
    - [Terminals](pages/tips/terminals.md)
    - [CCSID](pages/tips/ccsid.md)
+   - [Setup](pages/tips/setup.md)
 - [Browsers](pages/browsers/index.md)
    - [User Library List](pages/browsers/user-library-list.md)
    - [Object Browser](pages/browsers/object-browser.md)
@@ -20,4 +21,7 @@
    - [Profiles](pages/settings/profiles.md)
    - [Connection](pages/settings/connection.md)
    - [Global](pages/settings/global.md)
+- Extensions
+   - [RPGLE language tools](pages/extensions/rpgle.md)
+   - [Db2 for i](pages/extensions/db2i.md)
 - [Extending](pages/api/extending.md)
