@@ -155,7 +155,7 @@ module.exports = class objectBrowserTwoProvider {
 
           if (result === `Yes`) {
             const connection = instance.getConnection();
-            const {library, file, member} = connection.parserMemberPath(node.path);
+            const { library, file, member } = connection.parserMemberPath(node.path);
 
             try {
               await connection.remoteCommand(
@@ -180,7 +180,7 @@ module.exports = class objectBrowserTwoProvider {
       vscode.commands.registerCommand(`code-for-ibmi.updateMemberText`, async (node) => {
         if (node) {
           const connection = instance.getConnection();
-          const {library, file, member, basename} = connection.parserMemberPath(node.path);
+          const { library, file, member, basename } = connection.parserMemberPath(node.path);
 
           const newText = await vscode.window.showInputBox({
             value: node.description,
@@ -236,7 +236,7 @@ module.exports = class objectBrowserTwoProvider {
                 this.refresh();
               }
               else vscode.window.showInformationMessage(`Renamed member. Reload required.`);
-            } catch(e) {
+            } catch (e) {
               vscode.window.showErrorMessage(`Error renaming member! ${e}`);
             }
           }
@@ -252,7 +252,7 @@ module.exports = class objectBrowserTwoProvider {
 
         if (originPath) {
           const connection = instance.getConnection();
-          const {asp, library, file, member} = connection.parserMemberPath(node.path);
+          const { asp, library, file, member } = connection.parserMemberPath(node.path);
           const data = fs.readFileSync(originPath[0].fsPath, `utf8`);
 
           try {
@@ -269,7 +269,7 @@ module.exports = class objectBrowserTwoProvider {
         const contentApi = instance.getContent();
         const connection = instance.getConnection();
 
-        const {asp, library, file, member, basename} = connection.parserMemberPath(node.path);
+        const { asp, library, file, member, basename } = connection.parserMemberPath(node.path);
 
         const memberContent = await contentApi.downloadMemberContent(asp, library, file, member);
 
@@ -359,7 +359,7 @@ module.exports = class objectBrowserTwoProvider {
                       const patternExt = new RegExp(`^` + node.memberTypeFilter.replace(/[*]/g, `.*`).replace(/[$]/g, `\\$`) + `$`);
                       results = results.filter(result => {
                         const resultPath = result.path.split(`/`);
-                        const resultName = resultPath[resultPath.length-1];
+                        const resultName = resultPath[resultPath.length - 1];
                         const member = members.find(member => member.name === resultName);
                         return (member && patternExt.test(member.extension));
                       })
@@ -370,7 +370,7 @@ module.exports = class objectBrowserTwoProvider {
                       // Format result to include member type.
                       results.forEach(result => {
                         const resultPath = result.path.split(`/`);
-                        const resultName = resultPath[resultPath.length-1];
+                        const resultName = resultPath[resultPath.length - 1];
                         result.path += `.${members.find(member => member.name === resultName).extension}`;
                         result.path = result.path.toLowerCase();
                       });
@@ -378,7 +378,7 @@ module.exports = class objectBrowserTwoProvider {
                       results = results.sort((a, b) => {
                         return a.path.localeCompare(b.path);
                       });
-                  
+
                       instance.setSearchResults(searchTerm, results);
 
                     } else {
@@ -437,9 +437,34 @@ module.exports = class objectBrowserTwoProvider {
 
           await config.set(`objectFilters`, filters);
           if (Configuration.get(`autoRefresh`)) this.refresh();
+
+          // Add to library list ?
+          await vscode.window.showInformationMessage(`Would you like to add the new library to the library list?`, `Yes`, `No`)
+            .then(async result => {
+              switch (result) {
+                case `Yes`:
+                  await vscode.commands.executeCommand('code-for-ibmi.addToLibraryList',newLibrary);
+                  if (Configuration.get(`autoRefresh`)) vscode.commands.executeCommand('code-for-ibmi.refreshLibraryListView');
+
+                  break;
+              }
+            });
+
+          // Save connection profile ?
+          vscode.window.showInformationMessage(`Would you like to save the profile?`, `Yes`, `No`)
+            .then(async result => {
+              switch (result) {
+                case `Yes`:
+                  vscode.commands.executeCommand('code-for-ibmi.saveConnectionProfile');
+
+                  break;
+              }
+            });
+
         } else {
           vscode.window.showErrorMessage(`Library name too long.`);
         }
+
       }),
 
       vscode.commands.registerCommand(`code-for-ibmi.createSourceFile`, async (node) => {
@@ -510,50 +535,50 @@ module.exports = class objectBrowserTwoProvider {
       let filter;
 
       switch (element.contextValue) {
-      case `filter`:
-        /** @type {ILEObject} */ //@ts-ignore We know what is it based on contextValue.
-        const obj = element;
+        case `filter`:
+          /** @type {ILEObject} */ //@ts-ignore We know what is it based on contextValue.
+          const obj = element;
 
-        filter = config.objectFilters.find(filter => filter.name === obj.filter);
-        const objects = await content.getObjectList(filter);
-        items = objects.map(object =>
-          object.attribute === `*PHY` ? new SPF(filter.name, object, filter.member, filter.memberType) : new ILEObject(filter.name, object)
-        );
-        break;
+          filter = config.objectFilters.find(filter => filter.name === obj.filter);
+          const objects = await content.getObjectList(filter);
+          items = objects.map(object =>
+            object.attribute === `*PHY` ? new SPF(filter.name, object, filter.member, filter.memberType) : new ILEObject(filter.name, object)
+          );
+          break;
 
-      case `SPF`:
-        /** @type {SPF} */ //@ts-ignore We know what is it based on contextValue.
-        const spf = element;
+        case `SPF`:
+          /** @type {SPF} */ //@ts-ignore We know what is it based on contextValue.
+          const spf = element;
 
-        filter = config.objectFilters.find(filter => filter.name === spf.filter);
-        const path = spf.path.split(`/`);
+          filter = config.objectFilters.find(filter => filter.name === spf.filter);
+          const path = spf.path.split(`/`);
 
-        try {
-          const members = await content.getMemberList(path[0], path[1], filter.member, filter.memberType);
-          items = members.map(member => new Member(member));
+          try {
+            const members = await content.getMemberList(path[0], path[1], filter.member, filter.memberType);
+            items = members.map(member => new Member(member));
 
-          await this.storeMemberList(spf.path, members.map(member => `${member.name}.${member.extension}`));
-        } catch (e) {
-          console.log(e);
+            await this.storeMemberList(spf.path, members.map(member => `${member.name}.${member.extension}`));
+          } catch (e) {
+            console.log(e);
 
-          // Work around since we can't get the member list if the users QCCSID is not setup.
-          if (config.enableSQL) {
-            if (e && e.message && e.message.includes(`CCSID`)) {
-              vscode.window.showErrorMessage(`Error getting member list. Disabling SQL and refreshing. It is recommended you reload. ${e.message}`, `Reload`).then(async (value) => {
-                if (value === `Reload`) {
-                  await vscode.commands.executeCommand(`workbench.action.reloadWindow`);
-                }
-              });
+            // Work around since we can't get the member list if the users QCCSID is not setup.
+            if (config.enableSQL) {
+              if (e && e.message && e.message.includes(`CCSID`)) {
+                vscode.window.showErrorMessage(`Error getting member list. Disabling SQL and refreshing. It is recommended you reload. ${e.message}`, `Reload`).then(async (value) => {
+                  if (value === `Reload`) {
+                    await vscode.commands.executeCommand(`workbench.action.reloadWindow`);
+                  }
+                });
 
-              config.set(`enableSQL`, false);
-              this.refresh();
+                config.set(`enableSQL`, false);
+                this.refresh();
+              }
+            } else {
+              throw e;
             }
-          } else {
-            throw e;
           }
-        }
 
-        break;
+          break;
       }
 
     } else {
@@ -595,7 +620,7 @@ class Filter extends vscode.TreeItem {
     super(filter.name, vscode.TreeItemCollapsibleState.Collapsed);
 
     this.contextValue = `filter`;
-    this.description = `${filter.library}/${filter.object}/${filter.member}.${filter.memberType||`*`} (${filter.types.join(`, `)})`;
+    this.description = `${filter.library}/${filter.object}/${filter.member}.${filter.memberType || `*`} (${filter.types.join(`, `)})`;
     this.library = filter.library;
     this.filter = filter.name;
   }
@@ -628,7 +653,7 @@ class ILEObject extends vscode.TreeItem {
    * @param {string} filter Filter name
    * @param {{library: string, name: string, type: string, text: string, attribute?: string}} objectInfo
    */
-  constructor(filter, {library, name, type, text, attribute}) {
+  constructor(filter, { library, name, type, text, attribute }) {
     if (type.startsWith(`*`)) type = type.substring(1);
 
     const icon = objectIcons[type] || objectIcons[``];

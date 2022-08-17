@@ -1171,31 +1171,37 @@
 				"command": "code-for-ibmi.endJob",
 				"title": "End job",
 				"category": "IBM i",
-				"icon": "$(close)"
+				"icon": "$(remove)"
 			},
 			{
 				"command": "code-for-ibmi.changeJob",
 				"title": "Change job",
 				"category": "IBM i",
-				"icon": "$(close)"
+				"icon": "$(edit)"
 			},
 			{
 				"command": "code-for-ibmi.holdJob",
 				"title": "Hold job",
 				"category": "IBM i",
-				"icon": "$(close)"
+				"icon": "$(debug-pause)"
 			},
 			{
 				"command": "code-for-ibmi.releaseJob",
 				"title": "Release job",
 				"category": "IBM i",
-				"icon": "$(close)"
+				"icon": "$(debug-continue)"
 			},
 			{
 				"command": "code-for-ibmi.historyJob",
 				"title": "History job",
 				"category": "IBM i",
-				"icon": "$(close)"
+				"icon": "$(history)"
+			},
+			{
+				"command": "code-for-ibmi.propertiesJob",
+				"title": "Job properties",
+				"category": "IBM i",
+				"icon": "$(info)"
 			}
 		],
 		"keybindings": [
@@ -1657,22 +1663,27 @@
 				{
 					"command": "code-for-ibmi.changeJob",
 					"when": "viewItem == activeJob || viewItem == myActiveJob",
-					"group": "1_activeJobList@1"
+					"group": "1_activeJobList@2"
 				},
 				{
 					"command": "code-for-ibmi.holdJob",
 					"when": "viewItem == activeJob || viewItem == myActiveJob",
-					"group": "1_activeJobList@1"
+					"group": "1_activeJobList@3"
 				},
 				{
 					"command": "code-for-ibmi.releaseJob",
 					"when": "viewItem == activeJob || viewItem == myActiveJob",
-					"group": "1_activeJobList@1"
+					"group": "1_activeJobList@4"
 				},
 				{
 					"command": "code-for-ibmi.historyJob",
 					"when": "viewItem == activeJob || viewItem == myActiveJob",
-					"group": "1_activeJobList@1"
+					"group": "2_activeJobList@5"
+				},
+				{
+					"command": "code-for-ibmi.propertiesJob",
+					"when": "viewItem == activeJob || viewItem == myActiveJob",
+					"group": "3_activeJobList@1"
 				},
 				{
 					"command": "code-for-ibmi.maintainJobFilter",
