@@ -764,6 +764,44 @@ export default class IBMi {
 
   /**
    * @param {string} string
+   * @returns {{asp?: string, libraryObject: string, fileObject: string}}
+   */
+  parserObjectPath(string) {
+    const result = {
+      asp: undefined,
+      libraryObject: undefined,
+      fileObject: undefined
+    };
+
+    const variant_chars_local = this.variantChars.local;
+    const validQsysName = new RegExp(`^[A-Z0-9${variant_chars_local}][A-Z0-9_${variant_chars_local}.]{0,9}$`);
+
+    // Remove leading slash
+    const path = string.startsWith(`/`) ? string.substring(1).toUpperCase().split(`/`) : string.toUpperCase().split(`/`);
+
+    // if (path.length > 0) result.basename = path[path.length - 1];
+    if (path.length > 0) result.fileObject = path[path.length - 1];
+    if (path.length > 1) result.libraryObject = path[path.length - 2];
+    if (path.length > 2) result.asp = path[path.length - 3];
+
+    if (!result.libraryObject || !result.fileObject) {
+      throw new Error(`Invalid path: ${string}. Use format LIB/SPF`);
+    }
+    if (result.asp && !validQsysName.test(result.asp)) {
+      throw new Error(`Invalid ASP name: ${result.asp}`);
+    }
+    if (!validQsysName.test(result.libraryObject)) {
+      throw new Error(`Invalid Library name: ${result.libraryObject}`);
+    }
+    if (!validQsysName.test(result.fileObject)) {
+      throw new Error(`Invalid Source File name: ${result.fileObject}`);
+    }
+
+    return result;
+  }
+
+  /**
+   * @param {string} string
    * @returns {string} result
    */
   sysNameInLocal(string: string) {
@@ -794,6 +832,42 @@ export default class IBMi {
     };
 
     return result;
+  }
+
+  /**
+   * 
+   * @param {number} century 
+   * @param {string} dateMMDDYY
+   * @returns {Date} dateConverted
+   */
+  dateMMDDYYToDate(century :number, dateMMDDYY :string){
+
+    const dateCentury = century == 0 ? 1900: 2000;
+    const year = century + parseInt(dateMMDDYY.substring(4, 6));
+    const month = parseInt(dateMMDDYY.substring(0, 2)) - 1;
+    const day = parseInt(dateMMDDYY.substring(2, 4));
+
+    const dateConverted = new Date(year, month, day);
+
+    return dateConverted;
+  }
+
+  /**
+   * 
+   * @param {number} century 
+   * @param {string} dateYYMMDD
+   * @returns {Date} dateConverted
+   */
+  dateYYMMDDToDate(century :number, dateYYMMDD :string){
+
+    const dateCentury = century == 0 ? 1900: 2000;
+    const year = century + parseInt(dateYYMMDD.substring(4, 6));
+    const month = parseInt(dateYYMMDD.substring(2, 4)) - 1;
+    const day = parseInt(dateYYMMDD.substring(0, 4));
+
+    const dateConverted = new Date(year, month, day);
+
+    return dateConverted;
   }
   
 }

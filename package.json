@@ -1102,6 +1102,12 @@
 				"title": "Close search view",
 				"category": "IBM i",
 				"icon": "$(close)"
+			},
+			{
+				"command": "code-for-ibmi.propertiesObject",
+				"title": "Properties",
+				"category": "IBM i",
+				"icon": "$(filter)"
 			}
 		],
 		"keybindings": [
@@ -1386,6 +1392,11 @@
 					"when": "viewItem == SPF"
 				},
 				{
+					"command": "code-for-ibmi.propertiesObject",
+					"when": "viewItem == SPF",
+					"group": "4_properties@1"
+				},
+				{
 					"command": "code-for-ibmi.runAction",
 					"when": "viewItem == member",
 					"group": "1_workspace@1"
@@ -1419,6 +1430,11 @@
 					"command": "code-for-ibmi.uploadAndReplaceMemberAsFile",
 					"when": "viewItem == member",
 					"group": "3_memberTransfer@2"
+				},
+				{
+					"command": "code-for-ibmi.propertiesObject",
+					"when": "viewItem == member",
+					"group": "4_properties@1"
 				},
 				{
 					"command": "code-for-ibmi.moveIFSShortcutDown",
@@ -1549,6 +1565,11 @@
 					"command": "code-for-ibmi.runAction",
 					"when": "viewItem == object",
 					"group": "1_workspace@1"
+				},
+				{
+					"command": "code-for-ibmi.propertiesObject",
+					"when": "viewItem == object",
+					"group": "2_properties@1"
 				}
 			]
 		},

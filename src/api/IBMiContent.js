@@ -495,4 +495,451 @@ module.exports = class IBMiContent {
 
     return errors;
   }
+
+  /**
+   * 
+   * @param {string} lib 
+   * @param {string} objName 
+   * @param {string} objType 
+   * @param {string} objSubType 
+   * @returns 
+   */
+  async getObjectProperties(lib, objName, objType, objSubType){
+
+    const config = this.ibmi.config;
+    const library = lib.toUpperCase();
+    const name = objName.toUpperCase();
+    const type = objType.toUpperCase();
+    const subType = objSubType.toUpperCase();
+    
+    let objectProperties = [];
+    let results;
+
+    switch (type) {
+    case `SRVPGM`:
+    case `PGM`:
+      if (config.enableSQL){
+        objectProperties = await this.runSQL([`SELECT q.propertie, q.value
+        FROM QSYS2.PROGRAM_INFO a,
+        table (values
+        ('Name', a.PROGRAM_NAME),
+        ('Attribute', a.PROGRAM_ATTRIBUTE),
+        ('Object type', a.OBJECT_TYPE),
+        ('Type', a.PROGRAM_TYPE),
+        ('Text', a.TEXT_DESCRIPTION),
+        ('Size', trim(TO_CHAR(a.OPM_PROGRAM_SIZE,'999G999G999G999'))),
+        ('Owner', a.PROGRAM_OWNER),
+        ('Created', varchar_format(a.CREATE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')),
+        ('Source file member', a.SOURCE_FILE_MEMBER),
+        ('Source file', a.SOURCE_FILE),
+        ('Source file library', a.SOURCE_FILE_LIBRARY)
+        ) AS Q(propertie, value)
+          WHERE A.PROGRAM_LIBRARY = '${library}'
+                AND A.PROGRAM_NAME = '${name}'
+                AND A.OBJECT_TYPE = '*${type}'`].join(` `));
+                
+      } else {
+
+        const tempLib = config.tempLibrary;
+        const tempName = Tools.makeid();
+
+        await this.ibmi.remoteCommand(`DSPOBJD OBJ(${library}/${name}) OBJTYPE(*${type}) DETAIL(*FULL) OUTPUT(*OUTFILE) OUTFILE(${tempLib}/${tempName})`);
+        results = await this.getTable(tempLib, tempName, tempName, true);
+
+        if (results.length === 1) {
+          if (results[0].ODOBNM.trim() === ``) {
+            return []
+          }
+        }
+
+        let resultsObject = results[0];
+        let i=0;
+        let dateCentury = 0;
+
+        Object.keys(resultsObject).forEach(key => {
+          const valeur = resultsObject[key];
+          switch (key) {
+          case `ODDCEN`:
+            dateCentury = valeur;
+            break;
+          case `ODOBNM`:
+            objectProperties[i] = {PROPERTIE: `Name`, VALUE: valeur};
+            break;
+          case `ODOBAT`:
+            objectProperties[i] = {PROPERTIE: `Attribute`, VALUE: valeur};
+            break;
+          case `ODOBTP`:
+            objectProperties[i] = {PROPERTIE: `Object type`, VALUE: valeur};
+            break;
+          case `ODOBTX`:
+            objectProperties[i] = {PROPERTIE: `Text`, VALUE: valeur};
+            break;
+          case `ODOBSZ`:
+            objectProperties[i] = {PROPERTIE: `Size`, VALUE: valeur};
+            break;
+          case `ODOBOW`:
+            objectProperties[i] = {PROPERTIE: `Owner`, VALUE: valeur};
+            break;
+          case `ODCDAT`:
+            const dateCreated = this.ibmi.dateMMDDYYToDate(dateCentury, valeur);
+            objectProperties[i] = {PROPERTIE: `Created`, VALUE: dateCreated.toString()};
+            break;
+          case `ODSRCM`:
+            objectProperties[i] = {PROPERTIE: `Source file member`, VALUE: valeur};
+            break;
+          case `ODSRCF`:
+            objectProperties[i] = {PROPERTIE: `Source file`, VALUE: valeur};
+            break;
+          case `ODSRCL`:
+            objectProperties[i] = {PROPERTIE: `Source file library`, VALUE: valeur};
+            break;
+        
+          default:
+            break;
+          }
+
+          i++;
+        });
+      }
+
+      break;
+
+    case `BNDDIR`:
+      if (config.enableSQL){
+        objectProperties =  await this.runSQL([`SELECT q.propertie, q.value
+        FROM TABLE ( QSYS2.OBJECT_STATISTICS('${library}', '*ALL', OBJECT_NAME => '${name}') ) A,
+        table (values
+        ('Long name', A.OBJLONGNAME),
+        ('Long schema', A.OBJLONGSCHEMA),
+        ('Object type', A.OBJTYPE),
+        ('Attribute', A.OBJATTRIBUTE),
+        ('Text', ifnull(A.OBJTEXT, '')),
+        ('Size', trim(TO_CHAR(A.OBJSIZE,'999G999G999G999'))),
+        ('iASP number', trim(TO_CHAR(A.IASP_NUMBER,'99999'))),
+        ('iASP name', A.IASP_NAME),
+        ('Save timestamp', ifnull(varchar_format(A.SAVE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Restore timestamp', ifnull(varchar_format(A.RESTORE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Save command', A.SAVE_COMMAND),
+        ('Save device', A.SAVE_DEVICE),
+        ('Save volume', A.SAVE_VOLUME),
+        ('Save label', A.SAVE_LABEL),
+        ('Save file name', ifnull(A.SAVE_FILE_NAME, '')),
+        ('Save file library', ifnull(A.SAVE_FILE_LIBRARY, '')),
+        ('Object owner', A.OBJOWNER),
+        ('Object audit', A.OBJECT_AUDIT),
+        ('Created', ifnull(varchar_format(A.OBJCREATED, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Definer', A.OBJDEFINER),
+        ('Created system', A.CREATED_SYSTEM),
+        ('Created system version', A.CREATED_SYSTEM_VERSION),
+        ('Domain', A.OBJECT_DOMAIN),
+        ('Change timestamp', ifnull(varchar_format(A.CHANGE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Last used timestamp', ifnull(varchar_format(A.LAST_USED_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Days used count', trim(TO_CHAR(A.DAYS_USED_COUNT,'999999'))),
+        ('Last reset timestamp', ifnull(varchar_format(A.LAST_RESET_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Source member', ifnull(A.SOURCE_MEMBER, '')),
+        ('Source library', ifnull(A.SOURCE_LIBRARY, '')),
+        ('Source file', ifnull(A.SOURCE_FILE, '')),
+        ('Source timestamp', ifnull(varchar_format(A.SOURCE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Journaled', A.JOURNALED),
+        ('Journal name', ifnull(A.JOURNAL_NAME, '')),
+        ('Journal library', ifnull(A.JOURNAL_LIBRARY, '')),
+        ('Journal images', ifnull(A.JOURNAL_IMAGES, ''))
+        ) AS Q(propertie, value)`].join(` `));
+        break;
+
+      }
+      break;
+
+    case `FILE`:
+      if (config.enableSQL){
+        objectProperties =  await this.runSQL([`SELECT q.propertie, q.value
+        FROM TABLE ( QSYS2.OBJECT_STATISTICS('${library}', '*ALL', OBJECT_NAME => '${name}') ) A,
+        table (values
+        ('Long name', A.OBJLONGNAME),
+        ('Long schema', A.OBJLONGSCHEMA),
+        ('Object type', A.OBJTYPE),
+        ('Attribute', A.OBJATTRIBUTE),
+        ('Text', ifnull(A.OBJTEXT, '')),
+        ('Size', trim(TO_CHAR(A.OBJSIZE,'999G999G999G999'))),
+        ('iASP number', trim(TO_CHAR(A.IASP_NUMBER,'99999'))),
+        ('iASP name', A.IASP_NAME),
+        ('Save timestamp', ifnull(varchar_format(A.SAVE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Restore timestamp', ifnull(varchar_format(A.RESTORE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Save command', A.SAVE_COMMAND),
+        ('Save device', A.SAVE_DEVICE),
+        ('Save volume', A.SAVE_VOLUME),
+        ('Save label', A.SAVE_LABEL),
+        ('Save file name', ifnull(A.SAVE_FILE_NAME, '')),
+        ('Save file library', ifnull(A.SAVE_FILE_LIBRARY, '')),
+        ('Object owner', A.OBJOWNER),
+        ('Object audit', A.OBJECT_AUDIT),
+        ('Created', ifnull(varchar_format(A.OBJCREATED, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Definer', A.OBJDEFINER),
+        ('Created system', A.CREATED_SYSTEM),
+        ('Created system version', A.CREATED_SYSTEM_VERSION),
+        ('Domain', A.OBJECT_DOMAIN),
+        ('Change timestamp', ifnull(varchar_format(A.CHANGE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Last used timestamp', ifnull(varchar_format(A.LAST_USED_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Days used count', trim(TO_CHAR(A.DAYS_USED_COUNT,'999999'))),
+        ('Last reset timestamp', ifnull(varchar_format(A.LAST_RESET_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Source member', ifnull(A.SOURCE_MEMBER, '')),
+        ('Source library', ifnull(A.SOURCE_LIBRARY, '')),
+        ('Source file', ifnull(A.SOURCE_FILE, '')),
+        ('Source timestamp', ifnull(varchar_format(A.SOURCE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Journaled', A.JOURNALED),
+        ('Journal name', ifnull(A.JOURNAL_NAME, '')),
+        ('Journal library', ifnull(A.JOURNAL_LIBRARY, '')),
+        ('Journal images', ifnull(A.JOURNAL_IMAGES, ''))
+        ) AS Q(propertie, value)`].join(` `));
+        break;
+
+      } else {
+
+        const tempLib = config.tempLibrary;
+        const tempName = Tools.makeid();
+
+        await this.ibmi.remoteCommand(`DSPFD FILE(${library}/${name}) TYPE(*ATR) OUTPUT(*OUTFILE) FILEATR(*${subType}) OUTFILE(${tempLib}/${tempName})`);
+        results = await this.getTable(tempLib, tempName, tempName, true);
+
+        if (results.length === 1) {
+          switch (subType) {
+          case `PF`:
+            if (results[0].PHFILE.trim() === ``) {
+              return []
+            }            
+            break;
+
+          case `LF`:
+            if (results[0].LGFILE.trim() === ``) {
+              return []
+            }            
+            break;
+        
+          default:
+            return []
+          }
+          
+        }
+
+        let resultsObject = results[0];
+        let i=0;
+        let dateCentury = 0;
+
+        switch (subType) {
+        case `PF`:
+          
+          Object.keys(resultsObject).forEach(key => {
+            const valeur = resultsObject[key];
+            switch (key) {
+            case `PHFCCN`:
+              dateCentury = valeur;
+              break;
+            case `PHLNTB`:
+              objectProperties[i] = {PROPERTIE: `Long name`, VALUE: valeur};
+              break;
+            case `PHFILE`:
+              objectProperties[i] = {PROPERTIE: `Short name`, VALUE: valeur};
+              break;
+            case `PHLIB`:
+              objectProperties[i] = {PROPERTIE: `Schema`, VALUE: valeur};
+              break;
+            case `PHFILA`:
+              objectProperties[i] = {PROPERTIE: `Object type`, VALUE: valeur};
+              break;
+            case `PHFATR`:
+              objectProperties[i] = {PROPERTIE: `Attribute`, VALUE: valeur};
+              break;
+            case `PHTXT`:
+              objectProperties[i] = {PROPERTIE: `Text`, VALUE: valeur};
+              break;
+            case `PHASP`:
+              objectProperties[i] = {PROPERTIE: `iASP number`, VALUE: valeur};
+              break;
+            case `PHFCDT`:
+              const dateCreated = this.ibmi.dateYYMMDDToDate(dateCentury, valeur);
+              objectProperties[i] = {PROPERTIE: `Created`, VALUE: dateCreated.toString()};
+              break;
+            case `PHJRNL`:
+              objectProperties[i] = {PROPERTIE: `Journaled`, VALUE: valeur};
+              break;
+            case `PHJRNM`:
+              objectProperties[i] = {PROPERTIE: `Journal name`, VALUE: valeur};
+              break;
+            case `PHJRLB`:
+              objectProperties[i] = {PROPERTIE: `Journal library`, VALUE: valeur};
+              break;
+            case `PHJRIM`:
+              objectProperties[i] = {PROPERTIE: `Journal images`, VALUE: valeur};
+              break;
+          
+            default:
+              break;
+            }
+
+            i++;
+          });
+          break;
+
+        case `LF`:
+          
+          Object.keys(resultsObject).forEach(key => {
+            const valeur = resultsObject[key];
+            switch (key) {
+            case `LGFCCN`:
+              dateCentury = valeur;
+              break;
+            case `LGLNTB`:
+              objectProperties[i] = {PROPERTIE: `Long name`, VALUE: valeur};
+              break;
+            case `LGFILE`:
+              objectProperties[i] = {PROPERTIE: `Short name`, VALUE: valeur};
+              break;
+            case `LGLIB`:
+              objectProperties[i] = {PROPERTIE: `Schema`, VALUE: valeur};
+              break;
+            case `LGFILA`:
+              objectProperties[i] = {PROPERTIE: `Object type`, VALUE: valeur};
+              break;
+            case `LGFATR`:
+              objectProperties[i] = {PROPERTIE: `Attribute`, VALUE: valeur};
+              break;
+            case `LGTXT`:
+              objectProperties[i] = {PROPERTIE: `Text`, VALUE: valeur};
+              break;
+            case `LGASP`:
+              objectProperties[i] = {PROPERTIE: `iASP number`, VALUE: valeur};
+              break;
+            case `LGFCDT`:
+              const dateCreated = this.ibmi.dateYYMMDDToDate(dateCentury, valeur);
+              objectProperties[i] = {PROPERTIE: `Created`, VALUE: dateCreated.toString()};
+              break;
+            case `LGNOFM`:
+              objectProperties[i] = {PROPERTIE: `Number of record formats`, VALUE: valeur};
+              break;
+            case `LGFLS`:
+              objectProperties[i] = {PROPERTIE: `Externally described`, VALUE: valeur};
+              break;
+            case `LGSELO`:
+              objectProperties[i] = {PROPERTIE: `Select/Omit`, VALUE: valeur};
+              break;
+          
+            default:
+              break;
+            }
+
+            i++;
+          });
+                     
+          break;
+        }
+      }
+
+    case `DTAARA`:
+      if (config.enableSQL){
+        objectProperties =  await this.runSQL([`SELECT q.propertie, q.value
+        FROM TABLE ( QSYS2.OBJECT_STATISTICS('${library}', '*ALL', OBJECT_NAME => '${name}') ) A,
+        table (values
+        ('Long name', A.OBJLONGNAME),
+        ('Long schema', A.OBJLONGSCHEMA),
+        ('Object type', A.OBJTYPE),
+        ('Attribute', A.OBJATTRIBUTE),
+        ('Text', ifnull(A.OBJTEXT, '')),
+        ('Size', trim(TO_CHAR(A.OBJSIZE,'999G999G999G999'))),
+        ('iASP number', trim(TO_CHAR(A.IASP_NUMBER,'99999'))),
+        ('iASP name', A.IASP_NAME),
+        ('Save timestamp', ifnull(varchar_format(A.SAVE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Restore timestamp', ifnull(varchar_format(A.RESTORE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Save command', A.SAVE_COMMAND),
+        ('Save device', A.SAVE_DEVICE),
+        ('Save volume', A.SAVE_VOLUME),
+        ('Save label', A.SAVE_LABEL),
+        ('Save file name', ifnull(A.SAVE_FILE_NAME, '')),
+        ('Save file library', ifnull(A.SAVE_FILE_LIBRARY, '')),
+        ('Object owner', A.OBJOWNER),
+        ('Object audit', A.OBJECT_AUDIT),
+        ('Created', ifnull(varchar_format(A.OBJCREATED, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Definer', A.OBJDEFINER),
+        ('Created system', A.CREATED_SYSTEM),
+        ('Created system version', A.CREATED_SYSTEM_VERSION),
+        ('Domain', A.OBJECT_DOMAIN),
+        ('Change timestamp', ifnull(varchar_format(A.CHANGE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Last used timestamp', ifnull(varchar_format(A.LAST_USED_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Days used count', trim(TO_CHAR(A.DAYS_USED_COUNT,'999999'))),
+        ('Last reset timestamp', ifnull(varchar_format(A.LAST_RESET_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Source member', ifnull(A.SOURCE_MEMBER, '')),
+        ('Source library', ifnull(A.SOURCE_LIBRARY, '')),
+        ('Source file', ifnull(A.SOURCE_FILE, '')),
+        ('Source timestamp', ifnull(varchar_format(A.SOURCE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Journaled', A.JOURNALED),
+        ('Journal name', ifnull(A.JOURNAL_NAME, '')),
+        ('Journal library', ifnull(A.JOURNAL_LIBRARY, '')),
+        ('Journal images', ifnull(A.JOURNAL_IMAGES, ''))
+        ) AS Q(propertie, value)
+        union all
+        SELECT q.propertie, q.value
+        FROM TABLE ( QSYS2.DATA_AREA_INFO( DATA_AREA_NAME => 'BILNUM', DATA_AREA_LIBRARY => 'DENITRAL') ) A,
+        TABLE (VALUES('Data area type',A.DATA_AREA_TYPE),
+            ('Length',trim(TO_CHAR(A.LENGTH,'999999999999'))),
+            ('Decimal positions', trim(TO_CHAR(A.LENGTH,'999999999999'))),
+            ('Value', A.DATA_AREA_VALUE)
+        ) AS Q (propertie, value)`].join(` `));
+        break;
+
+      }
+
+      break;
+
+    default:
+      break;
+    }
+
+    return objectProperties;
+  }
+
+  
+  /**
+   * 
+   * @param {string} libraryMember 
+   * @param {string} fileMember 
+   * @param {string} memberName 
+   * @returns 
+   */
+  async getMemberProperties(libraryMember, fileMember, memberName){
+
+    const config = this.ibmi.config;
+    const library = libraryMember.toUpperCase();
+    const file = fileMember.toUpperCase();
+    const member = memberName.toUpperCase();
+    
+    let memberProperties = [];
+
+    if (config.enableSQL){
+      memberProperties = await this.runSQL([`SELECT q.propertie, q.value
+      FROM QSYS2.SYSPARTITIONSTAT a,
+      table (values
+        ('Member', a.SYSTEM_TABLE_MEMBER),
+        ('File', a.SYSTEM_TABLE_NAME),
+        ('Library', a.SYSTEM_TABLE_SCHEMA),
+        ('Type', a.SOURCE_TYPE),
+        ('Member text', a.PARTITION_TEXT),
+        ('Created', varchar_format(a.CREATE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')),
+        ('Last updated', ifnull(varchar_format(a.LAST_SOURCE_UPDATE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Change timestamp', ifnull(varchar_format(a.LAST_CHANGE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Save timestamp', ifnull(varchar_format(a.LAST_SAVE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Restore timestamp', ifnull(varchar_format(a.LAST_RESTORE_TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), '')),
+        ('Records', trim(TO_CHAR(a.NUMBER_ROWS,'999G999G999G999'))),
+        ('Deleted records', trim(TO_CHAR(a.NUMBER_DELETED_ROWS, '999G999G999G999'))),
+        ('Size', trim(TO_CHAR(a.DATA_SIZE,'999G999G999G999'))))
+            AS Q(propertie, value)
+          WHERE a.SYSTEM_TABLE_SCHEMA = '${library}'
+            AND a.SYSTEM_TABLE_NAME = '${file}'
+            AND a.SOURCE_TYPE IS NOT NULL 
+            AND a.SYSTEM_TABLE_MEMBER = '${member}'`].join(` `));
+              
+    } else {
+
+    }
+
+    return memberProperties;
+  }
 }
