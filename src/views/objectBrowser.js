@@ -54,6 +54,67 @@ module.exports = class objectBrowserTwoProvider {
         }
       }),
 
+      vscode.commands.registerCommand(`code-for-ibmi.moveFilterUp`, async (node) => {
+        if (node) {
+          try {
+            await this.moveFilterInList(node.filter, `UP`);
+            if (Configuration.get(`autoRefresh`)) this.refresh();
+          } catch(e) {
+            console.log(e);
+          };
+        }
+      }),
+
+      vscode.commands.registerCommand(`code-for-ibmi.moveFilterDown`, async (node) => {
+        if (node) {
+          try {
+            await this.moveFilterInList(node.filter, `DOWN`);
+            if (Configuration.get(`autoRefresh`)) this.refresh();
+          } catch(e) {
+            console.log(e);
+          };
+        }
+      }),
+
+      vscode.commands.registerCommand(`code-for-ibmi.moveFilterToTop`, async (node) => {
+        if (node) {
+          try {
+            await this.moveFilterInList(node.filter, `TOP`);
+            if (Configuration.get(`autoRefresh`)) this.refresh();
+          } catch(e) {
+            console.log(e);
+          };
+        }
+      }),
+
+      vscode.commands.registerCommand(`code-for-ibmi.moveFilterToBottom`, async (node) => {
+        if (node) {
+          try {
+            await this.moveFilterInList(node.filter, `BOTTOM`);
+            if (Configuration.get(`autoRefresh`)) this.refresh();
+          } catch(e) {
+            console.log(e);
+          };
+        }
+      }),
+
+      vscode.commands.registerCommand(`code-for-ibmi.sortFilters`, async (node) => {
+        const config = instance.getConfig();
+
+        let objectFilters = config.objectFilters;
+
+        objectFilters.sort(function(a, b){
+          const x = a.name.toLowerCase();
+          const y = b.name.toLowerCase();
+          if (x < y) {return -1;}
+          if (x > y) {return 1;}
+          return 0;
+        });
+
+        await config.set(`objectFilters`, objectFilters);
+        if (Configuration.get(`autoRefresh`)) this.refresh();
+      }),
+
       vscode.commands.registerCommand(`code-for-ibmi.refreshObjectBrowser`, async () => {
         this.refresh();
       }),
@@ -228,10 +289,31 @@ module.exports = class objectBrowserTwoProvider {
                   `RNMM FILE(${lib}/${spf}) MBR(${oldMember.member}) NEWMBR(${newMember.member})`,
                 );
               }
-              if (oldMember.extension !== newMember.extension) {
-                await connection.remoteCommand(
-                  `CHGPFM FILE(${lib}/${spf}) MBR(${newMember.member}) SRCTYPE(${newMember.extension})`,
-                );
+            }
+
+            if (newBasename) {
+              if (newBasename.toUpperCase() === oldMember.basename) {
+                newNameOK = false;
+              } else {
+                try {
+                  if (oldMember.member !== newMember.member) {
+                    await connection.remoteCommand(
+                      `RNMM FILE(${lib}/${spf}) MBR(${oldMember.member}) NEWMBR(${newMember.member})`,
+                    );
+                  }
+                  if (oldMember.extension !== newMember.extension) {
+                    await connection.remoteCommand(
+                      `CHGPFM FILE(${lib}/${spf}) MBR(${newMember.member}) SRCTYPE(${newMember.extension.length > 0 ? newMember.extension : `*NONE`})`,
+                    );
+                  }
+                  if (Configuration.get(`autoRefresh`)) {
+                    this.refresh();
+                  }
+                  else vscode.window.showInformationMessage(`Renamed member. Refresh object browser.`);
+                } catch(e) {
+                  newNameOK = false;
+                  vscode.window.showErrorMessage(`Error renaming member! ${e}`);
+                }
               }
               if (Configuration.get(`autoRefresh`)) {
                 this.refresh();
@@ -543,7 +625,83 @@ module.exports = class objectBrowserTwoProvider {
           //Running from command.
         }
       }),
+
+      vscode.commands.registerCommand(`code-for-ibmi.changeObjectDesc`, async (node) => {
+        if (node) {
+          let newText = node.text;
+          let newTextOK;
+          do {
+            newText = await vscode.window.showInputBox({
+              prompt: `Change object description for ${node.path}, *BLANK for no description`,
+              value: newText,
+              validateInput: newText => {
+                return newText.length <= 50 ? null : `Object description must be 50 chars or less.`;
+              }
+            });
+
+            if (newText) {
+              const escapedText = newText.replace(/'/g, `''`).replace(/`/g, `\\\``);
+              const connection = instance.getConnection();
+
+              try {
+                newTextOK = true;
+                await connection.remoteCommand(
+                  `CHGOBJD OBJ(${node.path}) OBJTYPE(*${node.type}) TEXT(${newText.toUpperCase() !== `*BLANK` ? `'${escapedText}'` : `*BLANK`})`
+                );
+                if (Configuration.get(`autoRefresh`)) {
+                  vscode.window.showInformationMessage(`Changed object description for ${node.path} *${node.type}.`);
+                  this.refresh();
+                } else {
+                  vscode.window.showInformationMessage(`Changed object description. Refresh object browser.`);
+                }
+              } catch (e) {
+                vscode.window.showErrorMessage(`Error changing description for ${node.path}! ${e}`);
+                newTextOK = false;
+              }
+            }
+          } while(newText && !newTextOK)
+        } else {
+          //Running from command
+          console.log(this);
+        }
+      })
+
     )
+  }
+
+  async moveFilterInList(filterName, filterMovement) {
+    filterMovement = filterMovement.toUpperCase();
+    if (![`TOP`, `UP`, `DOWN`, `BOTTOM`].includes(filterMovement)) throw `Illegal filter movement value specified`;
+
+    const config = instance.getConfig();
+
+    let objectFilters = config.objectFilters;
+    const from = objectFilters.findIndex(filter => filter.name === filterName);
+    let to;
+
+    if (from === -1) throw `Filter ${filterName} is not found in list`;
+    if (from === 0 && [`TOP`, `UP`].includes(filterMovement)) throw `Filter ${filterName} is at top of list`;
+    if (from === objectFilters.length && [`DOWN`, `BOTTOM`].includes(filterMovement)) throw `Filter ${filterName} is at bottom of list`;
+
+    switch(filterMovement) {
+    case `TOP`:
+      to = 0;
+      break;
+    case `UP`:
+      to = from - 1;
+      break;
+    case `DOWN`:
+      to = from + 1;
+      break;
+    case `BOTTOM`:
+      to = objectFilters.length;
+      break;
+    }
+
+    const filter = objectFilters[from];
+    objectFilters.splice(from, 1);
+    objectFilters.splice(to, 0, filter);
+    await config.set(`objectFilters`, objectFilters);
   }
 
   refresh() {
@@ -565,7 +723,8 @@ module.exports = class objectBrowserTwoProvider {
   async getChildren(element) {
     const content = instance.getContent();
     const config = instance.getConfig();
-    let items = [];
+    const objectNamesLower = Configuration.get(`ObjectBrowser.showNamesInLowercase`);
+    let items = [], item;
 
     if (element) {
       let filter;
@@ -576,9 +735,17 @@ module.exports = class objectBrowserTwoProvider {
         const obj = element;
 
         filter = config.objectFilters.find(filter => filter.name === obj.filter);
-        const objects = await content.getObjectList(filter);
+        let objects = await content.getObjectList(filter);
+        if (objectNamesLower === true) {
+          objects = objects.map(object => {
+            object.name = object.name.toLocaleLowerCase();
+            object.type = object.type.toLocaleLowerCase();
+            object.attribute = object.attribute.toLocaleLowerCase();
+            return object;
+          })
+        };
         items = objects.map(object =>
-          object.attribute === `*PHY` ? new SPF(filter.name, object, filter.member, filter.memberType) : new ILEObject(filter.name, object)
+          object.attribute.toLocaleUpperCase() === `*PHY` ? new SPF(filter.name, object, filter.member, filter.memberType) : new ILEObject(filter.name, object)
         );
         break;
 
@@ -590,7 +757,15 @@ module.exports = class objectBrowserTwoProvider {
         const path = spf.path.split(`/`);
 
         try {
-          const members = await content.getMemberList(path[0], path[1], filter.member, filter.memberType);
+          let members = await content.getMemberList(path[0], path[1], filter.member, filter.memberType);
+          if (objectNamesLower === true) {
+            members = members.map(member => {
+              member.file = member.file.toLocaleLowerCase();
+              member.name = member.name.toLocaleLowerCase();
+              member.extension = member.extension.toLocaleLowerCase();
+              return member;
+            })
+          };
           items = members.map(member => new Member(member));
 
           await this.storeMemberList(spf.path, members.map(member => `${member.name}.${member.extension}`));
@@ -670,7 +845,7 @@ class SPF extends vscode.TreeItem {
    * @param {string} memberTypeFilter Member type filter string
    */
   constructor(filter, detail, memberFilter, memberTypeFilter) {
-    super(detail.name.toLowerCase(), vscode.TreeItemCollapsibleState.Collapsed);
+    super(detail.name, vscode.TreeItemCollapsibleState.Collapsed);
 
     this.filter = filter;
     this.memberFilter = memberFilter;
@@ -694,15 +869,16 @@ class ILEObject extends vscode.TreeItem {
 
     const icon = objectIcons[type] || objectIcons[``];
 
-    super(`${name.toLowerCase()}.${type.toLowerCase()}`);
+    super(`${name}.${type}`);
 
     this.filter = filter;
 
     this.contextValue = `object`;
     this.path = `${library}/${name}`;
     this.type = type;
-    this.description = text + (attribute ? ` (${attribute.toLowerCase()})` : ``);
+    this.description = text + (attribute ? ` (${attribute})` : ``);
     this.iconPath = new vscode.ThemeIcon(icon);
+    this.text = text;
 
     this.resourceUri = vscode.Uri.from({
       scheme: `object`,
@@ -716,7 +892,7 @@ class Member extends vscode.TreeItem {
   constructor(member) {
     const path = `${member.asp ? `${member.asp}/` : ``}${member.library}/${member.file}/${member.name}.${member.extension}`;
 
-    super(`${member.name}.${member.extension}`.toLowerCase());
+    super(`${member.name}.${member.extension}`);
 
     this.contextValue = `member`;
     this.description = member.text;
@@ -751,5 +927,15 @@ const objectIcons = {
   'CMD': `terminal`,
   'MODULE': `extensions`,
   'PGM': `file-binary`,
+  'DTAARA': `clippy`,
+  'DTAQ': `list-ordered`,
+  'JOBQ': `checklist`,
+  'LIB': `library`,
+  'MEDDFN': `save-all`,
+  'OUTQ': `symbol-enum`,
+  'PNLGRP': `book`,
+  'SBSD': `server-process`,
+  'SRVPGM': `file-submodule`,
+  'USRSPC': `chrome-maximize`,
   '': `circle-large-outline`
 }

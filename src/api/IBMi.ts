@@ -870,4 +870,39 @@ export default class IBMi {
     return dateConverted;
   }
   
+  /**
+   * 
+   * @param {*} century 
+   * @param {*} dateMMDDYY
+   * @returns {Date} dateConverted
+   */
+  dateMMDDYYToDate(century, dateMMDDYY){
+
+    const dateCentury = century == 0 ? 1900: 2000;
+    const year = century + parseInt(dateMMDDYY.substring(4, 6));
+    const month = parseInt(dateMMDDYY.substring(0, 2)) - 1;
+    const day = parseInt(dateMMDDYY.substring(2, 4));
+
+    const dateConverted = new Date(year, month, day);
+
+    return dateConverted;
+  }
+
+  /**
+   * 
+   * @param {*} century 
+   * @param {*} dateYYMMDD
+   * @returns {Date} dateConverted
+   */
+  dateYYMMDDToDate(century, dateYYMMDD){
+
+    const dateCentury = century == 0 ? 1900: 2000;
+    const year = century + parseInt(dateYYMMDD.substring(4, 6));
+    const month = parseInt(dateYYMMDD.substring(2, 4)) - 1;
+    const day = parseInt(dateYYMMDD.substring(0, 4));
+
+    const dateConverted = new Date(year, month, day);
+
+    return dateConverted;
+  }
 }
